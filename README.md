@@ -27,7 +27,7 @@ A random media picker for Jellyfin and Plex. Shufflefin helps you decide what to
 
 ## Prerequisites
 
-* Python 3.10 or higher
+* Python 3.10 to 3.13
 * Node.js 18 or higher
 * A running Jellyfin or Plex media server
 
