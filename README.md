@@ -131,7 +131,7 @@ If you have StreamyStats configured, a Watchlist mode toggle will appear, lettin
 
 ## License
 
-This project is open source. Feel free to use, modify, and distribute it.
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
 
 ## Thanks
 
