@@ -116,7 +116,7 @@ const SearchableMultiSelect = ({
           className="w-full px-4 py-2.5 bg-secondary/30 border border-border/50 rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
         />
         {filtered.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
             {filtered.map((item) => (
               <button
                 key={item.id}
@@ -208,7 +208,7 @@ const FilterPanel = ({ isOpen, onToggle, service, filters, onFiltersChange, onRe
   };
 
   return (
-    <motion.div initial={false} className="glass rounded-2xl overflow-hidden">
+    <motion.div initial={false} className="glass rounded-2xl">
       <div className="flex items-center">
         <button
           onClick={onToggle}
@@ -246,7 +246,7 @@ const FilterPanel = ({ isOpen, onToggle, service, filters, onFiltersChange, onRe
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="overflow-hidden"
+            className="overflow-visible"
           >
             <div className="px-5 pb-5 space-y-5 border-t border-border/30 pt-4">
               {/* Library selector */}
@@ -334,7 +334,7 @@ const FilterPanel = ({ isOpen, onToggle, service, filters, onFiltersChange, onRe
                     className="w-full px-4 py-2.5 bg-secondary/30 border border-border/50 rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
                   />
                   {filteredCast.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
                       {filteredCast.map((name) => (
                         <button
                           key={name}
