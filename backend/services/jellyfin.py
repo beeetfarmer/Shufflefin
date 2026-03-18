@@ -20,6 +20,46 @@ def _compute_watch_status(user_data: dict) -> tuple[str, float]:
     return "unwatched", 0.0
 
 
+def _dedupe_items(items: list[dict]) -> list[dict]:
+    """Deduplicate Jellyfin item payloads by Id."""
+    seen_ids: set[str] = set()
+    unique_items: list[dict] = []
+    for item in items:
+        item_id = item.get("Id")
+        if item_id and item_id not in seen_ids:
+            seen_ids.add(item_id)
+            unique_items.append(item)
+    return unique_items
+
+
+def _apply_filters(
+    items: list[dict],
+    *,
+    exclude_watched: bool,
+    selected_cast: list[str] | None,
+    selected_tags: list[str] | None,
+) -> list[dict]:
+    """Apply local filters that Jellyfin does not reliably handle for multi-values."""
+    filtered = items
+
+    if exclude_watched:
+        filtered = filter_watched_content(filtered)
+        if not filtered:
+            return []
+
+    if selected_cast and len(selected_cast) > 1:
+        filtered = filter_by_cast(filtered, selected_cast)
+        if not filtered:
+            return []
+
+    if selected_tags and len(selected_tags) > 1:
+        filtered = filter_by_tags(filtered, selected_tags)
+        if not filtered:
+            return []
+
+    return filtered
+
+
 def get_libraries():
     """Get all media libraries from Jellyfin."""
     try:
@@ -225,8 +265,7 @@ def get_random_media(
         if not user_id:
             return []
 
-        # When we need client-side filtering (multi-cast, tags), fetch more.
-        # Otherwise let the server do all the work and limit results.
+        # Multi-cast and multi-tag filters must be handled locally.
         needs_client_filter = (
             (selected_cast and len(selected_cast) > 1)
             or selected_tags
@@ -241,10 +280,6 @@ def get_random_media(
             "enableUserData": True,
             "sortBy": "Random",
         }
-
-        if not needs_client_filter:
-            # Server can handle everything - just fetch what we need
-            params["limit"] = count * 3  # small buffer for watched filtering
 
         if selected_genres:
             params["genreIds"] = ",".join(selected_genres)
@@ -263,45 +298,63 @@ def get_random_media(
         if selected_tags and len(selected_tags) == 1:
             params["tags"] = selected_tags[0]
 
-        response = requests.get(
-            f"{JELLYFIN_URL}/Users/{user_id}/Items",
-            headers=get_jellyfin_headers(),
-            params=params,
-            timeout=REQUEST_TIMEOUT,
-        )
+        # Always keep upstream calls bounded. For client-side filtering we
+        # fetch a few random batches and merge; this avoids huge unbounded
+        # requests that can easily hit read timeouts on large libraries.
+        batch_limit = min(500, max(80, count * (20 if needs_client_filter else 3)))
+        attempts = 3 if needs_client_filter else 1
 
-        if response.status_code != 200:
-            logger.error(f"Failed to fetch media items: {response.status_code}")
-            return []
+        merged_items: list[dict] = []
+        for attempt in range(attempts):
+            params["limit"] = batch_limit
 
-        items = response.json().get("Items", [])
+            try:
+                response = requests.get(
+                    f"{JELLYFIN_URL}/Users/{user_id}/Items",
+                    headers=get_jellyfin_headers(),
+                    params=params,
+                    timeout=REQUEST_TIMEOUT,
+                )
+            except requests.exceptions.Timeout:
+                logger.warning(
+                    "Jellyfin random media request timed out (attempt %s/%s, limit=%s)",
+                    attempt + 1,
+                    attempts,
+                    batch_limit,
+                )
+                continue
+
+            if response.status_code != 200:
+                logger.error(f"Failed to fetch media items: {response.status_code}")
+                return []
+
+            batch_items = response.json().get("Items", [])
+            if not batch_items:
+                continue
+
+            merged_items.extend(batch_items)
+            merged_items = _dedupe_items(merged_items)
+
+            filtered_items = _apply_filters(
+                merged_items,
+                exclude_watched=exclude_watched,
+                selected_cast=selected_cast,
+                selected_tags=selected_tags,
+            )
+            if len(filtered_items) >= count:
+                merged_items = filtered_items
+                break
+        else:
+            merged_items = _apply_filters(
+                _dedupe_items(merged_items),
+                exclude_watched=exclude_watched,
+                selected_cast=selected_cast,
+                selected_tags=selected_tags,
+            )
+
+        items = merged_items
         if not items:
             return []
-
-        # Deduplicate by item ID (recursive queries can return duplicates)
-        seen_ids = set()
-        unique_items = []
-        for item in items:
-            item_id = item.get("Id")
-            if item_id and item_id not in seen_ids:
-                seen_ids.add(item_id)
-                unique_items.append(item)
-        items = unique_items
-
-        if exclude_watched:
-            items = filter_watched_content(items)
-            if not items:
-                return []
-
-        if selected_cast and len(selected_cast) > 1:
-            items = filter_by_cast(items, selected_cast)
-            if not items:
-                return []
-
-        if selected_tags and len(selected_tags) > 1:
-            items = filter_by_tags(items, selected_tags)
-            if not items:
-                return []
 
         selected_count = min(count, len(items))
         selected_items = random.sample(items, selected_count)
@@ -335,6 +388,6 @@ def get_random_media(
             )
 
         return processed_items
-    except Exception as e:
+    except Exception:
         logger.error("Error fetching random media", exc_info=True)
         return []

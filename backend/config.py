@@ -6,7 +6,10 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # Request timeout for all upstream HTTP calls (seconds)
-REQUEST_TIMEOUT = 15
+try:
+    REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", "15"))
+except ValueError:
+    REQUEST_TIMEOUT = 15
 
 # Jellyfin configuration
 JELLYFIN_URL = os.getenv("JELLYFIN_URL", "http://localhost:8096")

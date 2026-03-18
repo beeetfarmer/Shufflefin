@@ -77,6 +77,9 @@ PLEX_TOKEN=your-plex-token
 # StreamyStats (optional, enables watchlist shuffle)
 STREAMYSTATS_URL=http://localhost:3000
 STREAMYSTATS_TOKEN=your-jellyfin-user-access-token
+
+# Optional timeout (seconds) for upstream API requests
+REQUEST_TIMEOUT=15
 ```
 
 You need to configure at least one media server (Jellyfin or Plex). StreamyStats is optional and adds the ability to shuffle from your watchlists.
