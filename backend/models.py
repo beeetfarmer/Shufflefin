@@ -55,6 +55,20 @@ class Watchlist(BaseModel):
 class WatchlistShuffleRequest(BaseModel):
     watchlist_id: int = Field(..., ge=1)
     count: int = Field(1, ge=1, le=20)
+    exclude_watched: bool = False
+
+
+class WatchlistCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    description: Optional[str] = Field(None, max_length=1000)
+
+
+class WatchlistAddItemRequest(BaseModel):
+    item_id: str = Field(..., min_length=1, max_length=128)
+
+
+class WatchlistAddItemResponse(BaseModel):
+    success: bool = True
 
 
 class HealthResponse(BaseModel):

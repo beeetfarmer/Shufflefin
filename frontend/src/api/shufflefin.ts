@@ -8,6 +8,9 @@ import type {
   ShuffleRequest,
   Watchlist,
   WatchlistShuffleRequest,
+  WatchlistCreateRequest,
+  WatchlistAddItemRequest,
+  WatchlistAddItemResponse,
 } from "./types";
 
 export function getHealth(): Promise<HealthResponse> {
@@ -56,6 +59,25 @@ export function shuffleWatchlist(
   request: WatchlistShuffleRequest,
 ): Promise<MediaItem[]> {
   return apiFetch("/streamystats/watchlists/shuffle", {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
+}
+
+export function createWatchlist(
+  request: WatchlistCreateRequest,
+): Promise<Watchlist> {
+  return apiFetch("/streamystats/watchlists", {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
+}
+
+export function addItemToWatchlist(
+  watchlistId: number,
+  request: WatchlistAddItemRequest,
+): Promise<WatchlistAddItemResponse> {
+  return apiFetch(`/streamystats/watchlists/${watchlistId}/items`, {
     method: "POST",
     body: JSON.stringify(request),
   });

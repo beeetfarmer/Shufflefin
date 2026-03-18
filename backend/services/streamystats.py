@@ -1,6 +1,7 @@
 import requests
 import random
 import logging
+from typing import Any
 
 from backend.config import (
     STREAMYSTATS_URL, get_streamystats_headers,
@@ -10,6 +11,50 @@ from backend.config import (
 from backend.utils.connection import get_user_id
 
 logger = logging.getLogger(__name__)
+
+
+class StreamyStatsRequestError(Exception):
+    def __init__(self, status_code: int, message: str):
+        super().__init__(message)
+        self.status_code = status_code
+        self.message = message
+
+
+def _extract_data(payload: Any):
+    if isinstance(payload, dict):
+        return payload.get("data", payload)
+    return payload
+
+
+def _extract_error_message(response: requests.Response, fallback: str) -> str:
+    try:
+        payload = response.json()
+        if isinstance(payload, dict):
+            if isinstance(payload.get("error"), str) and payload["error"].strip():
+                return payload["error"].strip()
+            if isinstance(payload.get("detail"), str) and payload["detail"].strip():
+                return payload["detail"].strip()
+    except Exception:
+        pass
+
+    try:
+        text = response.text.strip()
+        if text:
+            return text
+    except Exception:
+        pass
+
+    return fallback
+
+
+def _normalize_watchlist(wl: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": wl.get("id"),
+        "name": wl.get("name", "Unnamed"),
+        "description": wl.get("description"),
+        "item_count": wl.get("itemCount", 0),
+        "allowed_item_type": wl.get("allowedItemType"),
+    }
 
 
 def check_connection():
@@ -45,22 +90,93 @@ def get_watchlists():
             logger.error(f"Error fetching watchlists: {response.status_code}")
             return []
 
-        data = response.json()
+        payload = response.json()
         # Response wraps list under "data" key with camelCase fields
-        items = data.get("data", data if isinstance(data, list) else [])
-        return [
-            {
-                "id": wl.get("id"),
-                "name": wl.get("name", "Unnamed"),
-                "description": wl.get("description"),
-                "item_count": wl.get("itemCount", 0),
-                "allowed_item_type": wl.get("allowedItemType"),
-            }
-            for wl in items
-        ]
-    except Exception as e:
+        items = _extract_data(payload)
+        if not isinstance(items, list):
+            return []
+
+        return [_normalize_watchlist(wl) for wl in items if isinstance(wl, dict)]
+    except Exception:
         logger.error("Error fetching watchlists", exc_info=True)
         return []
+
+
+def create_watchlist(name: str, description: str | None = None):
+    """Create a StreamyStats watchlist and return normalized watchlist data."""
+    payload: dict[str, Any] = {"name": name.strip()}
+    if description and description.strip():
+        payload["description"] = description.strip()
+
+    try:
+        response = requests.post(
+            f"{STREAMYSTATS_URL}/api/watchlists",
+            headers=get_streamystats_headers(),
+            json=payload,
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.exceptions.ConnectionError as exc:
+        raise StreamyStatsRequestError(
+            503,
+            "Cannot connect to StreamyStats. Is it running?",
+        ) from exc
+    except Exception as exc:
+        logger.error("Error creating StreamyStats watchlist", exc_info=True)
+        raise StreamyStatsRequestError(
+            502,
+            "Unexpected error creating StreamyStats watchlist.",
+        ) from exc
+
+    if response.status_code not in (200, 201):
+        raise StreamyStatsRequestError(
+            response.status_code,
+            _extract_error_message(response, "Failed to create StreamyStats watchlist."),
+        )
+
+    try:
+        raw = _extract_data(response.json())
+    except Exception as exc:
+        raise StreamyStatsRequestError(
+            502,
+            "StreamyStats returned an invalid response while creating watchlist.",
+        ) from exc
+
+    if not isinstance(raw, dict):
+        raise StreamyStatsRequestError(
+            502,
+            "StreamyStats returned an unexpected watchlist payload.",
+        )
+
+    return _normalize_watchlist(raw)
+
+
+def add_item_to_watchlist(watchlist_id: int, item_id: str):
+    """Add an item to a StreamyStats watchlist."""
+    payload = {"itemId": item_id.strip()}
+    try:
+        response = requests.post(
+            f"{STREAMYSTATS_URL}/api/watchlists/{watchlist_id}/items",
+            headers=get_streamystats_headers(),
+            json=payload,
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.exceptions.ConnectionError as exc:
+        raise StreamyStatsRequestError(
+            503,
+            "Cannot connect to StreamyStats. Is it running?",
+        ) from exc
+    except Exception as exc:
+        logger.error("Error adding item to StreamyStats watchlist", exc_info=True)
+        raise StreamyStatsRequestError(
+            502,
+            "Unexpected error adding item to StreamyStats watchlist.",
+        ) from exc
+
+    if response.status_code not in (200, 201):
+        raise StreamyStatsRequestError(
+            response.status_code,
+            _extract_error_message(response, "Failed to add item to StreamyStats watchlist."),
+        )
 
 
 def _fetch_jellyfin_item(item_id, user_id):
@@ -83,7 +199,70 @@ def _fetch_jellyfin_item(item_id, user_id):
         return None
 
 
-def shuffle_from_watchlist(watchlist_id, count=1):
+def _compute_watch_status(user_data: dict[str, Any]):
+    played = user_data.get("Played", False)
+    played_pct = user_data.get("PlayedPercentage", 0)
+    if played:
+        return "watched", 100.0
+    if played_pct > 0:
+        return "partial", played_pct
+    return "unwatched", 0.0
+
+
+def _build_media_item_from_watchlist_entry(entry: dict[str, Any], user_id: str | None):
+    ss_item = entry.get("item", entry)
+    jellyfin_id = ss_item.get("id", entry.get("itemId", ""))
+
+    # For episodes, use the series ID for richer metadata
+    effective_id = ss_item.get("seriesId") or jellyfin_id
+
+    # Fetch full details from Jellyfin
+    full_item = _fetch_jellyfin_item(effective_id, user_id)
+
+    if full_item:
+        cast = [
+            p.get("Name")
+            for p in full_item.get("People", [])
+            if p.get("Type") == "Actor"
+        ][:4]
+
+        watch_status, watch_percent = _compute_watch_status(
+            full_item.get("UserData", {}),
+        )
+
+        return {
+            "id": str(effective_id),
+            "title": full_item.get("Name", "Unknown Title"),
+            "synopsis": full_item.get("Overview", "No overview available."),
+            "rating": full_item.get("CommunityRating"),
+            "genres": full_item.get("Genres", []),
+            "cast": cast,
+            "tags": full_item.get("Tags", []),
+            "year": full_item.get("ProductionYear"),
+            "poster": f"/api/proxy/image?service=jellyfin&item_id={effective_id}",
+            "watch_status": watch_status,
+            "watch_percent": watch_percent,
+            "service": "jellyfin",
+        }
+
+    # Fallback to StreamyStats data if Jellyfin fetch fails
+    return {
+        "id": str(jellyfin_id),
+        "title": ss_item.get("name", "Unknown Title"),
+        "synopsis": "No overview available.",
+        "rating": ss_item.get("communityRating"),
+        "genres": ss_item.get("genres", []),
+        "cast": [],
+        "tags": [],
+        "year": ss_item.get("productionYear"),
+        "poster": f"/api/proxy/image?service=jellyfin&item_id={jellyfin_id}",
+        "watch_status": "unwatched",
+        "watch_percent": 0,
+        "service": "jellyfin",
+    }
+
+
+def shuffle_from_watchlist(watchlist_id, count=1, exclude_watched=False):
     """Pick random items from a StreamyStats watchlist and return MediaItem dicts."""
     try:
         response = requests.get(
@@ -101,70 +280,24 @@ def shuffle_from_watchlist(watchlist_id, count=1):
         if not entries:
             return []
 
+        user_id = get_user_id()
         selected_count = min(count, len(entries))
         selected = random.sample(entries, selected_count)
+        if exclude_watched:
+            selected = entries[:]
+            random.shuffle(selected)
 
-        user_id = get_user_id()
         results = []
         for entry in selected:
-            ss_item = entry.get("item", entry)
-            jellyfin_id = ss_item.get("id", entry.get("itemId", ""))
+            media_item = _build_media_item_from_watchlist_entry(entry, user_id)
+            if exclude_watched and media_item.get("watch_status") == "watched":
+                continue
 
-            # For episodes, use the series ID for richer metadata
-            effective_id = ss_item.get("seriesId") or jellyfin_id
-
-            # Fetch full details from Jellyfin
-            full_item = _fetch_jellyfin_item(effective_id, user_id)
-
-            if full_item:
-                cast = [
-                    p.get("Name")
-                    for p in full_item.get("People", [])
-                    if p.get("Type") == "Actor"
-                ][:4]
-
-                user_data = full_item.get("UserData", {})
-                played = user_data.get("Played", False)
-                played_pct = user_data.get("PlayedPercentage", 0)
-                if played:
-                    watch_status, watch_percent = "watched", 100.0
-                elif played_pct > 0:
-                    watch_status, watch_percent = "partial", played_pct
-                else:
-                    watch_status, watch_percent = "unwatched", 0.0
-
-                results.append({
-                    "id": str(effective_id),
-                    "title": full_item.get("Name", "Unknown Title"),
-                    "synopsis": full_item.get("Overview", "No overview available."),
-                    "rating": full_item.get("CommunityRating"),
-                    "genres": full_item.get("Genres", []),
-                    "cast": cast,
-                    "tags": full_item.get("Tags", []),
-                    "year": full_item.get("ProductionYear"),
-                    "poster": f"/api/proxy/image?service=jellyfin&item_id={effective_id}",
-                    "watch_status": watch_status,
-                    "watch_percent": watch_percent,
-                    "service": "jellyfin",
-                })
-            else:
-                # Fallback to StreamyStats data if Jellyfin fetch fails
-                results.append({
-                    "id": str(jellyfin_id),
-                    "title": ss_item.get("name", "Unknown Title"),
-                    "synopsis": "No overview available.",
-                    "rating": ss_item.get("communityRating"),
-                    "genres": ss_item.get("genres", []),
-                    "cast": [],
-                    "tags": [],
-                    "year": ss_item.get("productionYear"),
-                    "poster": f"/api/proxy/image?service=jellyfin&item_id={jellyfin_id}",
-                    "watch_status": "unwatched",
-                    "watch_percent": 0,
-                    "service": "jellyfin",
-                })
+            results.append(media_item)
+            if len(results) >= selected_count:
+                break
 
         return results
-    except Exception as e:
+    except Exception:
         logger.error("Error shuffling from watchlist", exc_info=True)
         return []

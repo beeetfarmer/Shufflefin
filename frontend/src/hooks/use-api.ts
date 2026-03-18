@@ -1,6 +1,11 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/api/shufflefin";
-import type { ShuffleRequest, MediaItem, WatchlistShuffleRequest } from "@/api/types";
+import type {
+  ShuffleRequest,
+  WatchlistShuffleRequest,
+  WatchlistCreateRequest,
+  WatchlistAddItemRequest,
+} from "@/api/types";
 
 export function useHealth() {
   return useQuery({
@@ -74,5 +79,29 @@ export function useWatchlistShuffle() {
   return useMutation({
     mutationFn: (request: WatchlistShuffleRequest) =>
       api.shuffleWatchlist(request),
+  });
+}
+
+export function useCreateWatchlist() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (request: WatchlistCreateRequest) =>
+      api.createWatchlist(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["watchlists"] });
+    },
+  });
+}
+
+export function useAddWatchlistItem() {
+  return useMutation({
+    mutationFn: ({
+      watchlistId,
+      request,
+    }: {
+      watchlistId: number;
+      request: WatchlistAddItemRequest;
+    }) => api.addItemToWatchlist(watchlistId, request),
   });
 }

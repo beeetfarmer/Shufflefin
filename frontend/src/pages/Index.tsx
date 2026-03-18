@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shuffle, AlertCircle, Library, List } from "lucide-react";
+import { Shuffle, AlertCircle, Library, List, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import AnimatedBackground from "@/components/AnimatedBackground";
 import ServiceToggle from "@/components/ServiceToggle";
@@ -10,6 +10,7 @@ import ShuffleRoulette from "@/components/ShuffleRoulette";
 import MediaCard from "@/components/MediaCard";
 import ThemeControls from "@/components/ThemeControls";
 import WatchlistPicker from "@/components/WatchlistPicker";
+import AddToWatchlistDialog from "@/components/AddToWatchlistDialog";
 import { useHealth, useShuffle, useWatchlistShuffle } from "@/hooks/use-api";
 import type { MediaItem } from "@/api/types";
 
@@ -20,6 +21,7 @@ const Index = () => {
   const [shuffleMode, setShuffleMode] = useState<ShuffleMode>("library");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [shuffleCount, setShuffleCount] = useState(3);
+  const [watchlistExcludeWatched, setWatchlistExcludeWatched] = useState(false);
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<number | null>(null);
   const [results, setResults] = useState<MediaItem[]>([]);
@@ -71,6 +73,7 @@ const Index = () => {
       const result = await watchlistShuffleMutation.mutateAsync({
         watchlist_id: selectedWatchlistId,
         count: shuffleCount,
+        exclude_watched: watchlistExcludeWatched,
       });
 
       setResults(result);
@@ -111,7 +114,7 @@ const Index = () => {
     }
 
     return result;
-  }, [shuffleMode, selectedWatchlistId, service, filters, shuffleCount, shuffleMutation, watchlistShuffleMutation, toast]);
+  }, [shuffleMode, selectedWatchlistId, service, filters, shuffleCount, watchlistExcludeWatched, shuffleMutation, watchlistShuffleMutation, toast]);
 
   const isShuffling = shuffleMutation.isPending || watchlistShuffleMutation.isPending;
 
@@ -255,15 +258,35 @@ const Index = () => {
                     }}
                   />
                 ) : (
-                  <WatchlistPicker
-                    selectedId={selectedWatchlistId}
-                    onSelect={(id) => {
-                      setSelectedWatchlistId(id);
-                      setResults([]);
-                      setHasShuffled(false);
-                      setSpinComplete(false);
-                    }}
-                  />
+                  <div className="space-y-3">
+                    <WatchlistPicker
+                      selectedId={selectedWatchlistId}
+                      onSelect={(id) => {
+                        setSelectedWatchlistId(id);
+                        setResults([]);
+                        setHasShuffled(false);
+                        setSpinComplete(false);
+                      }}
+                    />
+                    <div className="glass rounded-xl p-3">
+                      <button
+                        onClick={() => {
+                          setWatchlistExcludeWatched((prev) => !prev);
+                          setResults([]);
+                          setHasShuffled(false);
+                          setSpinComplete(false);
+                        }}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          watchlistExcludeWatched
+                            ? "bg-primary/15 text-primary border border-primary/30"
+                            : "bg-secondary/30 text-muted-foreground border border-transparent hover:border-border"
+                        }`}
+                      >
+                        {watchlistExcludeWatched ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        Exclude watched
+                      </button>
+                    </div>
+                  </div>
                 )}
               </motion.div>
 
@@ -289,7 +312,18 @@ const Index = () => {
                     transition={{ delay: 0.2 }}
                     className="w-full max-w-2xl mt-6"
                   >
-                    <MediaCard item={results[0]} index={0} />
+                    <MediaCard
+                      item={results[0]}
+                      index={0}
+                      action={
+                        streamystatsAvailable && shuffleMode === "library" ? (
+                          <AddToWatchlistDialog
+                            item={results[0]}
+                            triggerClassName="w-auto h-8 px-3 text-xs"
+                          />
+                        ) : undefined
+                      }
+                    />
                   </motion.div>
                 )}
               </motion.div>
@@ -317,7 +351,19 @@ const Index = () => {
                     <div className="space-y-3">
                       <AnimatePresence>
                         {results.slice(1).map((item, i) => (
-                          <MediaCard key={item.id} item={item} index={i} />
+                          <MediaCard
+                            key={`${item.id}-${i}`}
+                            item={item}
+                            index={i}
+                            action={
+                              streamystatsAvailable && shuffleMode === "library" ? (
+                                <AddToWatchlistDialog
+                                  item={item}
+                                  triggerClassName="w-auto h-8 px-3 text-xs"
+                                />
+                              ) : undefined
+                            }
+                          />
                         ))}
                       </AnimatePresence>
                     </div>

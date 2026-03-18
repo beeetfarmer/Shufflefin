@@ -7,9 +7,10 @@ import type { MediaItem } from "@/api/types";
 interface MediaCardProps {
   item: MediaItem;
   index: number;
+  action?: React.ReactNode;
 }
 
-const MediaCard = ({ item, index }: MediaCardProps) => {
+const MediaCard = ({ item, index, action }: MediaCardProps) => {
   const [expanded, setExpanded] = useState(false);
 
   const watchStatusColors = {
@@ -127,6 +128,8 @@ const MediaCard = ({ item, index }: MediaCardProps) => {
             {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             {expanded ? "Less" : "Synopsis"}
           </button>
+
+          {action && <div className="pt-2 flex justify-end">{action}</div>}
         </div>
       </div>
 

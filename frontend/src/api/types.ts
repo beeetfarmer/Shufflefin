@@ -51,6 +51,20 @@ export interface Watchlist {
 export interface WatchlistShuffleRequest {
   watchlist_id: number;
   count: number;
+  exclude_watched?: boolean;
+}
+
+export interface WatchlistCreateRequest {
+  name: string;
+  description?: string;
+}
+
+export interface WatchlistAddItemRequest {
+  item_id: string;
+}
+
+export interface WatchlistAddItemResponse {
+  success: boolean;
 }
 
 export interface HealthResponse {
