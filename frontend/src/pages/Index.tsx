@@ -388,6 +388,9 @@ const Index = () => {
           )}
         </main>
       </div>
+      <div className="fixed bottom-3 left-3 z-20 text-xs text-muted-foreground/80">
+        {__APP_VERSION__}
+      </div>
     </div>
   );
 };
