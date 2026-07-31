@@ -1,0 +1,8 @@
+# Normalize every text file to LF, in the repository and in working trees.
+# Without this the repo drifts: some files landed as CRLF, some as LF, and a
+# one-line change shows up as a whole-file diff.
+* text=auto eol=lf
+
+# Binary assets — leave the bytes alone.
+*.png binary
+*.ico binary
