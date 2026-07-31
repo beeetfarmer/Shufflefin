@@ -32,6 +32,40 @@ def _dedupe_items(items: list[dict]) -> list[dict]:
     return unique_items
 
 
+def _attach_people(user_id: str, items: list[dict]) -> None:
+    """Fill in People for the picked items, in place.
+
+    Expanding People across a whole library batch dominates the request time,
+    so the cast is fetched in one follow-up call covering only the few items
+    that were actually picked. A failure here costs the cast line on the card,
+    not the shuffle.
+    """
+    ids = [item["Id"] for item in items if item.get("Id")]
+    if not ids:
+        return
+
+    try:
+        response = requests.get(
+            f"{JELLYFIN_URL}/Users/{user_id}/Items",
+            headers=get_jellyfin_headers(),
+            params={"ids": ",".join(ids), "fields": "People"},
+            timeout=REQUEST_TIMEOUT,
+        )
+        if response.status_code != 200:
+            logger.warning("Cast lookup returned %s", response.status_code)
+            return
+        people_by_id = {
+            entry.get("Id"): entry.get("People", [])
+            for entry in response.json().get("Items", [])
+        }
+    except requests.exceptions.RequestException:
+        logger.warning("Cast lookup failed; picks will have no cast", exc_info=True)
+        return
+
+    for item in items:
+        item["People"] = people_by_id.get(item.get("Id"), [])
+
+
 def _apply_filters(
     items: list[dict],
     *,
@@ -271,11 +305,20 @@ def get_random_media(
             or selected_tags
         )
 
+        # People is roughly 30x slower to expand than every other field
+        # combined, so it is left out of the bulk query and fetched afterwards
+        # for the handful of items actually picked. The exception is
+        # multi-cast filtering, which needs People on every candidate.
+        needs_people_upfront = bool(selected_cast and len(selected_cast) > 1)
+        fields = "Overview,CommunityRating,ProductionYear,Genres,UserData,Tags"
+        if needs_people_upfront:
+            fields += ",People"
+
         params = {
             "parentId": library_id,
             "recursive": True,
             "includeItemTypes": "Movie,Series",
-            "fields": "Overview,CommunityRating,ProductionYear,Genres,People,UserData,Tags",
+            "fields": fields,
             "enableImages": True,
             "enableUserData": True,
             "sortBy": "Random",
@@ -288,7 +331,11 @@ def get_random_media(
             params["IsPlayed"] = "false"
             params["Filters"] = "IsNotPlayed"
 
-        if selected_cast and len(selected_cast) == 1:
+        if selected_cast:
+            # Cast filtering is AND, so anything matching every name also
+            # matches the first one. Narrowing server-side shrinks the
+            # candidate set enormously; the remaining names are applied
+            # locally by _apply_filters.
             params["Person"] = selected_cast[0]
 
         if year_range:
@@ -358,6 +405,9 @@ def get_random_media(
 
         selected_count = min(count, len(items))
         selected_items = random.sample(items, selected_count)
+
+        if not needs_people_upfront:
+            _attach_people(user_id, selected_items)
 
         processed_items = []
         for item in selected_items:
