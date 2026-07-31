@@ -121,44 +121,28 @@ npm run dev
 
 ## Docker
 
-### Running the published image
-
-The quickest way to self-host. One container serves both the API and the UI on port 8005.
+One container serves both the API and the UI on port 8005:
 
 ```
 cp .env.example .env    # fill in your Jellyfin/Plex details
 docker compose up -d
 ```
 
-Open http://localhost:8005.
-
-Or without Compose:
+Open http://localhost:8005. Without Compose:
 
 ```
 docker run -d --name shufflefin -p 8005:8005 --env-file .env beeetfarmer/shufflefin:latest
 ```
 
-Images are published to [Docker Hub](https://hub.docker.com/r/beeetfarmer/shufflefin) for `linux/amd64` and `linux/arm64`, tagged `latest`, `<version>`, and `sha-<commit>`.
+Images are on [Docker Hub](https://hub.docker.com/r/beeetfarmer/shufflefin) for `linux/amd64` and `linux/arm64`, tagged `latest`, `<version>` and `sha-<commit>`.
 
-### Developing in Docker
-
-The dev stack runs the backend and frontend as separate containers, both hot-reloading against your working tree:
+For development, both services hot-reload against your working tree:
 
 ```
-cp .env.example .env
 docker compose -f docker-compose.dev.yml up
 ```
 
-* UI at http://localhost:8081 — Vite dev server with HMR, proxying `/api` to the backend
-* API at http://localhost:8005 — uvicorn with `--reload`
-
-Edits under `backend/` restart the API; edits under `frontend/src/` hot-swap in the browser. If file changes stop triggering reloads on your host, set `VITE_USE_POLLING: "true"` in `docker-compose.dev.yml`.
-
-### Building locally
-
-```
-docker build --target runtime -t shufflefin:local .
-```
+UI on http://localhost:8081 (Vite with HMR, proxying `/api`), API on http://localhost:8005 (uvicorn `--reload`). Set `VITE_USE_POLLING: "true"` in `docker-compose.dev.yml` if file changes stop triggering reloads. Build the image yourself with `docker build --target runtime -t shufflefin:local .`
 
 ## How It Works
 
