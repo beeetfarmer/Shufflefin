@@ -13,7 +13,7 @@ RUN npm run build
 
 
 # ---- Stage 2: python dependencies (also the base for the dev container) ----
-FROM python:3.13-slim AS python-deps
+FROM python:3.14-slim AS python-deps
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -30,7 +30,7 @@ WORKDIR /app
 
 
 # ---- Stage 3: runtime ----
-FROM python:3.13-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
