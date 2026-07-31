@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Shuffle, Sparkles, Film } from "lucide-react";
 import type { MediaItem } from "@/api/types";
 
@@ -18,6 +18,21 @@ const PLACEHOLDER_TITLES = [
   "The suspense...",
 ];
 
+// Fewer tiles than this and the reel does not read as motion.
+const MIN_REEL = 5;
+const SPIN_MS = 60;
+const MIN_SPINS = 16;
+const DECEL_STEPS = 10;
+
+const toSpinItems = (items: MediaItem[]): SpinItem[] =>
+  items.map((r) => ({ title: r.title, year: r.year, poster: r.poster }));
+
+const placeholderItems = (): SpinItem[] =>
+  PLACEHOLDER_TITLES.map((t) => ({ title: t, year: null, poster: null }));
+
+const padReel = (items: SpinItem[], filler: SpinItem[]): SpinItem[] =>
+  items.length >= MIN_REEL ? items : [...items, ...filler].slice(0, MIN_REEL);
+
 interface ShuffleRouletteProps {
   onShuffle: () => Promise<MediaItem[]>;
   isLoading: boolean;
@@ -29,61 +44,112 @@ const ShuffleRoulette = ({ onShuffle, isLoading, previousResults, onSpinComplete
   const [isSpinning, setIsSpinning] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Snapshot of the tiles being cycled. Held in state rather than derived from
+  // previousResults so that results arriving mid-spin cannot swap the reel out
+  // from under the animation.
+  const [reel, setReel] = useState<SpinItem[] | null>(null);
+  const spinningRef = useRef(false);
+  const cancelledRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const spinItems: SpinItem[] =
-    previousResults.length > 0
-      ? previousResults.map((r) => ({ title: r.title, year: r.year, poster: r.poster }))
-      : PLACEHOLDER_TITLES.map((t) => ({ title: t, year: null, poster: null }));
+  useEffect(() => {
+    return () => {
+      cancelledRef.current = true;
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  // Drop the snapshot when the results are cleared from outside (filter change),
+  // so the idle tile falls back to placeholders instead of a stale poster.
+  useEffect(() => {
+    if (!spinningRef.current) setReel(null);
+  }, [previousResults]);
+
+  const sleep = (ms: number) =>
+    new Promise<void>((resolve) => {
+      timerRef.current = setTimeout(resolve, ms);
+    });
 
   const startShuffle = useCallback(async () => {
-    if (isSpinning || isLoading) return;
+    if (spinningRef.current || isLoading) return;
+
+    const spinReel = padReel(
+      previousResults.length > 0 ? toSpinItems(previousResults) : placeholderItems(),
+      placeholderItems(),
+    );
+
+    spinningRef.current = true;
     setIsSpinning(true);
     setShowResult(false);
+    setReel(spinReel);
+    setSelectedIndex(0);
 
-    let currentIdx = 0;
-    let iterations = 0;
-    const maxIterations = 25 + Math.floor(Math.random() * 10);
+    let fetched: MediaItem[] = [];
+    let failed = false;
+    let settled = false;
+    const request = onShuffle()
+      .then((r) => {
+        fetched = r;
+      })
+      .catch(() => {
+        failed = true;
+      })
+      .finally(() => {
+        settled = true;
+      });
 
-    const spin = () => {
-      currentIdx = (currentIdx + 1) % spinItems.length;
-      setSelectedIndex(currentIdx);
-      iterations++;
-
-      if (iterations >= maxIterations) {
-        return;
-      }
-
-      const speed = 60 + Math.pow(iterations / maxIterations, 2) * 300;
-      intervalRef.current = setTimeout(spin, speed);
+    const stop = () => {
+      spinningRef.current = false;
+      setIsSpinning(false);
     };
 
-    spin();
-
-    try {
-      await onShuffle();
-      await new Promise<void>((resolve) => {
-        const check = () => {
-          if (iterations >= maxIterations) {
-            resolve();
-          } else {
-            setTimeout(check, 50);
-          }
-        };
-        check();
-      });
-      setSelectedIndex(0);
-      setIsSpinning(false);
-      setShowResult(true);
-      onSpinComplete?.();
-    } catch {
-      if (intervalRef.current) clearTimeout(intervalRef.current);
-      setIsSpinning(false);
+    // Phase 1 — steady blur that keeps running until the request lands, so the
+    // reel never freezes on a tile while waiting on the network.
+    let idx = 0;
+    let spins = 0;
+    while (!cancelledRef.current && (!settled || spins < MIN_SPINS)) {
+      idx = (idx + 1) % spinReel.length;
+      setSelectedIndex(idx);
+      spins++;
+      await sleep(SPIN_MS);
     }
-  }, [isSpinning, isLoading, onShuffle, spinItems.length]);
 
-  const currentItem = spinItems[selectedIndex % spinItems.length];
-  const hasPosters = previousResults.length > 0;
+    await request;
+    if (cancelledRef.current) return;
+
+    if (failed) {
+      stop();
+      return;
+    }
+
+    if (fetched.length === 0) {
+      stop();
+      onSpinComplete?.();
+      return;
+    }
+
+    // Phase 2 — swap in the new picks and decelerate across them, so the reel
+    // visibly walks onto the winner instead of snapping to it.
+    const landingReel = padReel(toSpinItems(fetched), spinReel);
+    setReel(landingReel);
+
+    for (let step = DECEL_STEPS; step >= 1; step--) {
+      if (cancelledRef.current) return;
+      setSelectedIndex(((-step % landingReel.length) + landingReel.length) % landingReel.length);
+      await sleep(SPIN_MS + Math.pow((DECEL_STEPS - step + 1) / DECEL_STEPS, 2) * 260);
+    }
+    if (cancelledRef.current) return;
+
+    setSelectedIndex(0);
+    stop();
+    setShowResult(true);
+    onSpinComplete?.();
+  }, [isLoading, onShuffle, onSpinComplete, previousResults]);
+
+  const idleReel = previousResults.length > 0 ? toSpinItems(previousResults) : placeholderItems();
+  const displayReel = reel ?? idleReel;
+  const currentItem = displayReel[selectedIndex % displayReel.length] ?? displayReel[0];
+  const hasPosters = Boolean(currentItem?.poster);
 
   return (
     <div className="flex flex-col items-center gap-6">
