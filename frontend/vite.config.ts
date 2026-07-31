@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 // https://vitejs.dev/config/
-const appVersion = process.env.npm_package_version ?? "0.2.0";
+const appVersion = process.env.npm_package_version ?? "0.3.0";
 
 export default defineConfig(({ mode }) => ({
   server: {
