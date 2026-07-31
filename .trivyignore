@@ -1,0 +1,7 @@
+# react-router: RSC Mode CSRF Bypass Allows Action Execution Before 400 Response
+#
+# Fixed in react-router 8.3.0, which is not published — 7.18.2 is the latest
+# release, so there is nothing to upgrade to. The advisory only affects React
+# Server Components mode; Shufflefin is a client-side SPA using BrowserRouter
+# and never runs RSC. Revisit once 8.3.0 ships.
+GHSA-qwww-vcr4-c8h2 exp:2026-12-31

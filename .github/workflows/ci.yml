@@ -1,0 +1,26 @@
+name: CI
+
+# Runs the full gate on every dev push and on PRs into dev or main.
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    secrets: inherit
