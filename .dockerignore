@@ -1,0 +1,29 @@
+# VCS and CI
+.git
+.gitignore
+.github
+.claude
+
+# Secrets — never bake these into an image
+.env
+.env.local
+.env.*.local
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Node — rebuilt inside the image
+frontend/node_modules/
+frontend/dist/
+
+# Local artifacts and docs
+Dockerfile
+docker-compose*.yml
+Screenshots/
+README.md
+LICENSE
+*.log

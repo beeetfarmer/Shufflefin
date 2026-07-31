@@ -12,9 +12,14 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    // Bind mounts on some hosts do not propagate inotify events; set
+    // VITE_USE_POLLING=true if hot reload goes quiet inside Docker.
+    watch: {
+      usePolling: process.env.VITE_USE_POLLING === "true",
+    },
     proxy: {
       "/api": {
-        target: "http://localhost:8005",
+        target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost:8005",
         changeOrigin: true,
       },
     },

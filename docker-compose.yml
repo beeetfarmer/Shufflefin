@@ -1,0 +1,20 @@
+# Production / self-host: one container serving the API and the built UI.
+#
+#   cp .env.example .env   # fill in your Jellyfin/Plex details first
+#   docker compose up -d
+#
+# Then open http://localhost:8005
+
+services:
+  shufflefin:
+    image: beeetfarmer/shufflefin:latest
+    # Comment `image` out and uncomment `build` to run your local source instead.
+    # build:
+    #   context: .
+    #   target: runtime
+    container_name: shufflefin
+    restart: unless-stopped
+    ports:
+      - "8005:8005"
+    env_file:
+      - .env

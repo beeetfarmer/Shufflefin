@@ -1,0 +1,46 @@
+# Development: two containers, both hot-reloading against your working tree.
+#
+#   cp .env.example .env
+#   docker compose -f docker-compose.dev.yml up
+#
+# UI:  http://localhost:8081   (Vite dev server, HMR, proxies /api to backend)
+# API: http://localhost:8005   (uvicorn --reload)
+#
+# Edit anything under ./backend or ./frontend/src and the change is live.
+
+services:
+  backend:
+    build:
+      context: .
+      target: python-deps
+    container_name: shufflefin-backend-dev
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8005 --reload
+    working_dir: /app
+    volumes:
+      - ./backend:/app/backend
+    ports:
+      - "8005:8005"
+    env_file:
+      - .env
+
+  frontend:
+    image: node:22-alpine
+    container_name: shufflefin-frontend-dev
+    working_dir: /app
+    # Installs on first boot only; the named volume keeps node_modules warm and
+    # stops the bind mount from shadowing it.
+    command: sh -c "[ -d node_modules/.bin ] || npm ci; exec npm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8005
+      # Set to "true" if file edits stop triggering reloads on your host.
+      VITE_USE_POLLING: "false"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "8081:8081"
+    depends_on:
+      - backend
+
+volumes:
+  frontend_node_modules:
