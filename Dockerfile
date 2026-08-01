@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Stage 1: build the frontend ----
-FROM node:24-alpine AS frontend-build
+FROM node:25-alpine AS frontend-build
 
 WORKDIR /build
 
