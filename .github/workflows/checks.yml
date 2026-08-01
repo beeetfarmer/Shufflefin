@@ -104,7 +104,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Reported to the Security tab regardless of severity, then gated below.
+      # Reported to the Security tab at every severity, then gated below.
+      # ignore-unfixed matches the gate: findings with no available fix are
+      # noise here, not signal, and would otherwise bury the actionable ones.
       - name: Trivy scan (SARIF)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -113,6 +115,7 @@ jobs:
           scanners: vuln,secret,misconfig
           format: sarif
           output: trivy-fs.sarif
+          ignore-unfixed: true
           trivyignores: .trivyignore
 
       - name: Upload SARIF
@@ -174,6 +177,7 @@ jobs:
           image-ref: shufflefin:ci
           format: sarif
           output: trivy-image.sarif
+          ignore-unfixed: true
           trivyignores: .trivyignore
 
       - name: Upload SARIF
