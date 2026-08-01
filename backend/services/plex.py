@@ -77,8 +77,7 @@ def get_libraries():
 
 def get_genres(library_id):
     """Get genres for a specific Plex library."""
-    library_id = str(library_id or "")
-    if not MEDIA_ID_RE.match(library_id):
+    if not isinstance(library_id, str) or not MEDIA_ID_RE.match(library_id):
         logger.warning("Rejected library id with unexpected format")
         return []
 
@@ -103,8 +102,7 @@ def get_genres(library_id):
 
 def get_cast_members(library_id, search=None):
     """Get all cast members from a Plex library."""
-    library_id = str(library_id or "")
-    if not MEDIA_ID_RE.match(library_id):
+    if not isinstance(library_id, str) or not MEDIA_ID_RE.match(library_id):
         logger.warning("Rejected library id with unexpected format")
         return []
 
@@ -124,8 +122,7 @@ def get_cast_members(library_id, search=None):
 
 def get_tags(library_id):
     """Get labels for items in a Plex library."""
-    library_id = str(library_id or "")
-    if not MEDIA_ID_RE.match(library_id):
+    if not isinstance(library_id, str) or not MEDIA_ID_RE.match(library_id):
         logger.warning("Rejected library id with unexpected format")
         return []
 
@@ -152,8 +149,7 @@ def get_tags(library_id):
 
 def get_available_years(library_id):
     """Get min/max years from Plex library items."""
-    library_id = str(library_id or "")
-    if not MEDIA_ID_RE.match(library_id):
+    if not isinstance(library_id, str) or not MEDIA_ID_RE.match(library_id):
         logger.warning("Rejected library id with unexpected format")
         return None
 
@@ -186,8 +182,7 @@ def get_random_media(
     year_range=None,
 ):
     """Get random media items from Plex based on filters."""
-    library_id = str(library_id or "")
-    if not MEDIA_ID_RE.match(library_id):
+    if not isinstance(library_id, str) or not MEDIA_ID_RE.match(library_id):
         logger.warning("Rejected library id with unexpected format")
         return []
     try:
