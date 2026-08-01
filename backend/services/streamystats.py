@@ -3,6 +3,7 @@ import random
 import logging
 from typing import Any
 
+from backend.utils.validation import is_media_id
 from backend.config import (
     STREAMYSTATS_URL, get_streamystats_headers,
     JELLYFIN_URL, get_jellyfin_headers,
@@ -152,6 +153,7 @@ def create_watchlist(name: str, description: str | None = None):
 
 def add_item_to_watchlist(watchlist_id: int, item_id: str):
     """Add an item to a StreamyStats watchlist."""
+    watchlist_id = int(watchlist_id)
     payload = {"itemId": item_id.strip()}
     try:
         response = requests.post(
@@ -181,6 +183,9 @@ def add_item_to_watchlist(watchlist_id: int, item_id: str):
 
 def _fetch_jellyfin_item(item_id, user_id):
     """Fetch full item details from Jellyfin for enriched metadata."""
+    if not is_media_id(item_id):
+        return None
+
     if not user_id or not JELLYFIN_URL:
         return None
     try:
@@ -264,13 +269,14 @@ def _build_media_item_from_watchlist_entry(entry: dict[str, Any], user_id: str |
 
 def shuffle_from_watchlist(watchlist_id, count=1, exclude_watched=False):
     """Pick random items from a StreamyStats watchlist and return MediaItem dicts."""
+    watchlist_id = int(watchlist_id)
     try:
         response = requests.get(
             f"{STREAMYSTATS_URL}/api/watchlists/{watchlist_id}",
             headers=get_streamystats_headers(), timeout=REQUEST_TIMEOUT,
         )
         if response.status_code != 200:
-            logger.error(f"Error fetching watchlist {watchlist_id}: {response.status_code}")
+            logger.error("Error fetching watchlist %s: %s", watchlist_id, response.status_code)
             return []
 
         data = response.json()
