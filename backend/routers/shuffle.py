@@ -18,7 +18,7 @@ router = APIRouter()
 def shuffle(service: str, req: ShuffleRequest):
     if service not in _SERVICE_VALUES:
         raise HTTPException(status_code=400, detail="Invalid service")
-    if not MEDIA_ID_RE.match(str(req.library_id)):
+    if not MEDIA_ID_RE.match(req.library_id):
         raise HTTPException(status_code=400, detail="Invalid library ID")
     svc = jf_service if service == "jellyfin" else plex_service
 
@@ -45,7 +45,7 @@ def proxy_image(
     item_id: str = Query(..., max_length=64),
 ):
     """Proxy images from Jellyfin/Plex with proper auth headers."""
-    if not MEDIA_ID_RE.match(str(item_id)):
+    if not MEDIA_ID_RE.match(item_id):
         raise HTTPException(status_code=400, detail="Invalid item ID")
     if service not in _SERVICE_VALUES:
         raise HTTPException(status_code=400, detail="Invalid service")

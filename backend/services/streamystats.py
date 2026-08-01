@@ -183,7 +183,8 @@ def add_item_to_watchlist(watchlist_id: int, item_id: str):
 
 def _fetch_jellyfin_item(item_id, user_id):
     """Fetch full item details from Jellyfin for enriched metadata."""
-    if not MEDIA_ID_RE.match(str(item_id)):
+    item_id = str(item_id or "")
+    if not MEDIA_ID_RE.match(item_id):
         return None
 
     if not user_id or not JELLYFIN_URL:
