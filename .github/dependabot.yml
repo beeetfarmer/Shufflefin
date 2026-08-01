@@ -15,6 +15,11 @@ updates:
     groups:
       npm:
         patterns: ["*"]
+    ignore:
+      # typescript-eslint does not support TypeScript 7 yet, so a major bump
+      # produces a lockfile npm cannot resolve. Drop this once it does.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: chore
 
