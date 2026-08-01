@@ -77,7 +77,7 @@ def get_libraries():
 
 def get_genres(library_id):
     """Get genres for a specific Plex library."""
-    if not is_media_id(library_id):
+    if not MEDIA_ID_RE.match(str(library_id)):
         logger.warning("Rejected library id with unexpected format")
         return []
 
@@ -102,7 +102,7 @@ def get_genres(library_id):
 
 def get_cast_members(library_id, search=None):
     """Get all cast members from a Plex library."""
-    if not is_media_id(library_id):
+    if not MEDIA_ID_RE.match(str(library_id)):
         logger.warning("Rejected library id with unexpected format")
         return []
 
@@ -122,7 +122,7 @@ def get_cast_members(library_id, search=None):
 
 def get_tags(library_id):
     """Get labels for items in a Plex library."""
-    if not is_media_id(library_id):
+    if not MEDIA_ID_RE.match(str(library_id)):
         logger.warning("Rejected library id with unexpected format")
         return []
 
@@ -149,7 +149,7 @@ def get_tags(library_id):
 
 def get_available_years(library_id):
     """Get min/max years from Plex library items."""
-    if not is_media_id(library_id):
+    if not MEDIA_ID_RE.match(str(library_id)):
         logger.warning("Rejected library id with unexpected format")
         return None
 
@@ -182,7 +182,7 @@ def get_random_media(
     year_range=None,
 ):
     """Get random media items from Plex based on filters."""
-    if not is_media_id(library_id):
+    if not MEDIA_ID_RE.match(str(library_id)):
         logger.warning("Rejected library id with unexpected format")
         return []
     try:
@@ -243,7 +243,7 @@ def get_random_media(
             cast_filtered_items = []
             for item in filtered_items:
                 item_id = item.get("ratingKey")
-                if not is_media_id(item_id):
+                if not MEDIA_ID_RE.match(str(item_id)):
                     continue
                 item_url = f"{PLEX_URL}/library/metadata/{item_id}"
                 item_response = requests.get(item_url, headers=get_plex_headers(), timeout=REQUEST_TIMEOUT)
@@ -273,7 +273,7 @@ def get_random_media(
             tag_filtered_items = []
             for item in filtered_items:
                 item_id = item.get("ratingKey")
-                if not is_media_id(item_id):
+                if not MEDIA_ID_RE.match(str(item_id)):
                     continue
                 item_url = f"{PLEX_URL}/library/metadata/{item_id}"
                 item_response = requests.get(item_url, headers=get_plex_headers(), timeout=REQUEST_TIMEOUT)
@@ -314,7 +314,7 @@ def get_random_media(
         processed_items = []
         for item in selected_items:
             item_id = item.get("ratingKey")
-            if not is_media_id(item_id):
+            if not MEDIA_ID_RE.match(str(item_id)):
                 continue
             item_url = f"{PLEX_URL}/library/metadata/{item_id}"
             item_response = requests.get(item_url, headers=get_plex_headers(), timeout=REQUEST_TIMEOUT)

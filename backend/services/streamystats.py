@@ -3,7 +3,7 @@ import random
 import logging
 from typing import Any
 
-from backend.utils.validation import is_media_id
+from backend.utils.validation import MEDIA_ID_RE
 from backend.config import (
     STREAMYSTATS_URL, get_streamystats_headers,
     JELLYFIN_URL, get_jellyfin_headers,
@@ -183,7 +183,7 @@ def add_item_to_watchlist(watchlist_id: int, item_id: str):
 
 def _fetch_jellyfin_item(item_id, user_id):
     """Fetch full item details from Jellyfin for enriched metadata."""
-    if not is_media_id(item_id):
+    if not MEDIA_ID_RE.match(str(item_id)):
         return None
 
     if not user_id or not JELLYFIN_URL:

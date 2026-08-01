@@ -7,7 +7,7 @@ from backend.models import ShuffleRequest, MediaItem
 from backend.services import jellyfin as jf_service
 from backend.services import plex as plex_service
 from backend.config import JELLYFIN_URL, PLEX_URL, get_jellyfin_headers, get_plex_headers, REQUEST_TIMEOUT
-from backend.utils.validation import is_media_id
+from backend.utils.validation import MEDIA_ID_RE
 
 _SERVICE_VALUES = {"jellyfin", "plex"}
 
@@ -18,7 +18,7 @@ router = APIRouter()
 def shuffle(service: str, req: ShuffleRequest):
     if service not in _SERVICE_VALUES:
         raise HTTPException(status_code=400, detail="Invalid service")
-    if not is_media_id(req.library_id):
+    if not MEDIA_ID_RE.match(str(req.library_id)):
         raise HTTPException(status_code=400, detail="Invalid library ID")
     svc = jf_service if service == "jellyfin" else plex_service
 
@@ -45,7 +45,7 @@ def proxy_image(
     item_id: str = Query(..., max_length=64),
 ):
     """Proxy images from Jellyfin/Plex with proper auth headers."""
-    if not is_media_id(item_id):
+    if not MEDIA_ID_RE.match(str(item_id)):
         raise HTTPException(status_code=400, detail="Invalid item ID")
     if service not in _SERVICE_VALUES:
         raise HTTPException(status_code=400, detail="Invalid service")
