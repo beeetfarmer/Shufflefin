@@ -175,11 +175,11 @@ const ShuffleRoulette = ({ onShuffle, isLoading, previousResults, onSpinComplete
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary/10 via-secondary/50 to-primary/5 flex flex-col items-center justify-center gap-3">
+              <div className="w-full h-full bg-linear-to-br from-primary/10 via-secondary/50 to-primary/5 flex flex-col items-center justify-center gap-3">
                 <Film className={`w-10 h-10 text-primary/40 ${isSpinning ? "animate-pulse" : ""}`} />
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-background/40" />
+            <div className="absolute inset-0 bg-linear-to-t from-background/80 via-transparent to-background/40" />
             <div className="absolute bottom-3 left-3 right-3">
               <p className={`text-sm font-semibold truncate ${hasPosters ? "text-foreground" : "text-muted-foreground"}`}>
                 {currentItem.title}
@@ -196,7 +196,7 @@ const ShuffleRoulette = ({ onShuffle, isLoading, previousResults, onSpinComplete
         {/* Scanline effect while spinning */}
         {isSpinning && (
           <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-primary/5" />
+            <div className="absolute inset-0 bg-linear-to-b from-primary/5 via-transparent to-primary/5" />
             <motion.div
               className="absolute left-0 right-0 h-px bg-primary/40"
               animate={{ top: ["0%", "100%"] }}

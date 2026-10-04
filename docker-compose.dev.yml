@@ -24,12 +24,12 @@ services:
       - .env
 
   frontend:
-    image: node:22-alpine
+    image: node:24-alpine
     container_name: shufflefin-frontend-dev
     working_dir: /app
-    # Installs on first boot only; the named volume keeps node_modules warm and
-    # stops the bind mount from shadowing it.
-    command: sh -c "[ -d node_modules/.bin ] || npm ci; exec npm run dev -- --host 0.0.0.0"
+    # Reinstalls only when package-lock.json is newer than the last install; the
+    # named volume keeps node_modules warm and stops the bind mount shadowing it.
+    command: sh -c "[ node_modules/.package-lock.json -nt package-lock.json ] || npm ci; exec npm run dev -- --host 0.0.0.0"
     environment:
       VITE_API_PROXY_TARGET: http://backend:8005
       # Set to "true" if file edits stop triggering reloads on your host.

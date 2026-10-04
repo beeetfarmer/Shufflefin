@@ -27,7 +27,8 @@ STREAMYSTATS_TOKEN = os.getenv("STREAMYSTATS_TOKEN", "")
 
 def get_jellyfin_headers():
     return {
-        "X-MediaBrowser-Token": JELLYFIN_API_KEY,
+        # Newer Jellyfin servers reject the legacy X-MediaBrowser-Token header.
+        "Authorization": f'MediaBrowser Token="{JELLYFIN_API_KEY}"',
         "Content-Type": "application/json",
     }
 

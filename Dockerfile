@@ -13,7 +13,7 @@ RUN npm run build
 
 
 # ---- Stage 2: python dependencies (also the base for the dev container) ----
-FROM python:3.13-slim AS python-deps
+FROM python:3.14-slim AS python-deps
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -21,16 +21,18 @@ ENV PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
-RUN python -m venv /opt/venv
+# The venv gets no pip of its own: the base image's pip installs into it, so
+# pip (and the urllib3, msgpack and setuptools it vendors) never reaches runtime.
+RUN python -m venv --without-pip /opt/venv
 
 COPY backend/requirements.txt /tmp/requirements.txt
-RUN pip install -r /tmp/requirements.txt
+RUN pip --python /opt/venv/bin/python install -r /tmp/requirements.txt
 
 WORKDIR /app
 
 
 # ---- Stage 3: runtime ----
-FROM python:3.13-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -38,7 +40,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     STATIC_DIR=/app/static \
     PORT=8005
 
-RUN useradd --system --create-home --uid 10001 shufflefin
+# Debian security fixes land before the python image is rebuilt; pip is not
+# needed at runtime.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
+    && python -m pip uninstall -y -q pip \
+    && useradd --system --create-home --uid 10001 shufflefin
 
 COPY --from=python-deps /opt/venv /opt/venv
 

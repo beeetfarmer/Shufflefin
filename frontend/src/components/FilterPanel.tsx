@@ -113,7 +113,7 @@ const SearchableMultiSelect = ({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={placeholder}
-          className="w-full px-4 py-2.5 bg-secondary/30 border border-border/50 rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+          className="w-full px-4 py-2.5 bg-secondary/30 border border-border/50 rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
         />
         {filtered.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
@@ -331,7 +331,7 @@ const FilterPanel = ({ isOpen, onToggle, service, filters, onFiltersChange, onRe
                     value={castSearch}
                     onChange={(e) => setCastSearch(e.target.value)}
                     placeholder="Search by actor name..."
-                    className="w-full px-4 py-2.5 bg-secondary/30 border border-border/50 rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                    className="w-full px-4 py-2.5 bg-secondary/30 border border-border/50 rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
                   />
                   {filteredCast.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
@@ -371,7 +371,7 @@ const FilterPanel = ({ isOpen, onToggle, service, filters, onFiltersChange, onRe
                     value={filters.yearMin ?? yearRange?.min ?? ""}
                     onChange={(e) => update({ yearMin: e.target.value ? +e.target.value : null })}
                     placeholder={yearRange?.min?.toString() ?? "Min"}
-                    className="w-24 px-3 py-2 bg-secondary/30 border border-border/50 rounded-lg text-sm text-foreground text-center focus:outline-none focus:border-primary/50 transition-all"
+                    className="w-24 px-3 py-2 bg-secondary/30 border border-border/50 rounded-lg text-sm text-foreground text-center focus:outline-hidden focus:border-primary/50 transition-all"
                   />
                   <span className="text-muted-foreground text-sm">to</span>
                   <input
@@ -379,7 +379,7 @@ const FilterPanel = ({ isOpen, onToggle, service, filters, onFiltersChange, onRe
                     value={filters.yearMax ?? yearRange?.max ?? ""}
                     onChange={(e) => update({ yearMax: e.target.value ? +e.target.value : null })}
                     placeholder={yearRange?.max?.toString() ?? "Max"}
-                    className="w-24 px-3 py-2 bg-secondary/30 border border-border/50 rounded-lg text-sm text-foreground text-center focus:outline-none focus:border-primary/50 transition-all"
+                    className="w-24 px-3 py-2 bg-secondary/30 border border-border/50 rounded-lg text-sm text-foreground text-center focus:outline-hidden focus:border-primary/50 transition-all"
                   />
                 </div>
               </div>

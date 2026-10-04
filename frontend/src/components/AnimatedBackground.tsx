@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { useMemo } from "react";
 import { Film, Clapperboard, Popcorn, Tv, MonitorPlay } from "lucide-react";
 
 const ICONS = [Film, Clapperboard, Popcorn, Tv, MonitorPlay];
@@ -17,58 +16,60 @@ interface Particle {
   drift: number;
 }
 
+// Generated once per page load: random values must not be drawn during render.
+const particles: Particle[] = (() => {
+  const items: Particle[] = [];
+
+  // Bokeh circles
+  for (let i = 0; i < 18; i++) {
+    items.push({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: 4 + Math.random() * 80,
+      duration: 8 + Math.random() * 12,
+      delay: Math.random() * -10,
+      opacity: 0.02 + Math.random() * 0.04,
+      type: "bokeh",
+      drift: (Math.random() - 0.5) * 30,
+    });
+  }
+
+  // Floating media icons
+  for (let i = 0; i < 8; i++) {
+    items.push({
+      id: 100 + i,
+      x: 5 + Math.random() * 90,
+      y: Math.random() * 100,
+      size: 16 + Math.random() * 20,
+      duration: 10 + Math.random() * 12,
+      delay: Math.random() * -8,
+      opacity: 0.04 + Math.random() * 0.04,
+      type: "icon",
+      iconIndex: i % ICONS.length,
+      drift: (Math.random() - 0.5) * 20,
+    });
+  }
+
+  // Film strip fragments
+  for (let i = 0; i < 5; i++) {
+    items.push({
+      id: 200 + i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: 40 + Math.random() * 60,
+      duration: 15 + Math.random() * 10,
+      delay: Math.random() * -6,
+      opacity: 0.03 + Math.random() * 0.03,
+      type: "filmstrip",
+      drift: (Math.random() - 0.5) * 15,
+    });
+  }
+
+  return items;
+})();
+
 const AnimatedBackground = () => {
-  const particles = useMemo<Particle[]>(() => {
-    const items: Particle[] = [];
-
-    // Bokeh circles
-    for (let i = 0; i < 18; i++) {
-      items.push({
-        id: i,
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        size: 4 + Math.random() * 80,
-        duration: 8 + Math.random() * 12,
-        delay: Math.random() * -10,
-        opacity: 0.02 + Math.random() * 0.04,
-        type: "bokeh",
-        drift: (Math.random() - 0.5) * 30,
-      });
-    }
-
-    // Floating media icons
-    for (let i = 0; i < 8; i++) {
-      items.push({
-        id: 100 + i,
-        x: 5 + Math.random() * 90,
-        y: Math.random() * 100,
-        size: 16 + Math.random() * 20,
-        duration: 10 + Math.random() * 12,
-        delay: Math.random() * -8,
-        opacity: 0.04 + Math.random() * 0.04,
-        type: "icon",
-        iconIndex: i % ICONS.length,
-        drift: (Math.random() - 0.5) * 20,
-      });
-    }
-
-    // Film strip fragments
-    for (let i = 0; i < 5; i++) {
-      items.push({
-        id: 200 + i,
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        size: 40 + Math.random() * 60,
-        duration: 15 + Math.random() * 10,
-        delay: Math.random() * -6,
-        opacity: 0.03 + Math.random() * 0.03,
-        type: "filmstrip",
-        drift: (Math.random() - 0.5) * 15,
-      });
-    }
-
-    return items;
-  }, []);
 
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
@@ -175,13 +176,13 @@ const AnimatedBackground = () => {
               className="rounded-md border border-primary/20 overflow-hidden"
               style={{ width: p.size, height: p.size * 1.5 }}
             >
-              <div className="flex justify-between px-[2px] py-[1px]">
+              <div className="flex justify-between px-[2px] py-px">
                 {[...Array(3)].map((_, j) => (
                   <div key={j} className="w-[4px] h-[3px] rounded-[1px] bg-primary/30" />
                 ))}
               </div>
               <div className="flex-1 mx-1 my-[2px] bg-primary/5 rounded-sm" style={{ height: p.size * 1.1 }} />
-              <div className="flex justify-between px-[2px] py-[1px]">
+              <div className="flex justify-between px-[2px] py-px">
                 {[...Array(3)].map((_, j) => (
                   <div key={j} className="w-[4px] h-[3px] rounded-[1px] bg-primary/30" />
                 ))}

@@ -36,8 +36,8 @@ const MediaCard = ({ item, index, action }: MediaCardProps) => {
     >
       <div className="flex gap-0">
         {/* Poster */}
-        <div className="relative w-32 sm:w-40 flex-shrink-0">
-          <div className="aspect-[2/3] bg-secondary/50 overflow-hidden">
+        <div className="relative w-32 sm:w-40 shrink-0">
+          <div className="aspect-2/3 bg-secondary/50 overflow-hidden">
             {item.poster ? (
               <img
                 src={item.poster}
@@ -80,7 +80,7 @@ const MediaCard = ({ item, index, action }: MediaCardProps) => {
             </div>
             {/* Rating */}
             {item.rating != null && (
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
                 <Star className="w-4 h-4 text-primary fill-primary" />
                 <span className="text-sm font-semibold text-foreground">{item.rating}</span>
               </div>

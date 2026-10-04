@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shuffle, AlertCircle, Library, List, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -17,7 +17,7 @@ import type { MediaItem } from "@/api/types";
 type ShuffleMode = "library" | "watchlist";
 
 const Index = () => {
-  const [service, setService] = useState<"jellyfin" | "plex">("jellyfin");
+  const [chosenService, setService] = useState<"jellyfin" | "plex" | null>(null);
   const [shuffleMode, setShuffleMode] = useState<ShuffleMode>("library");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [shuffleCount, setShuffleCount] = useState(3);
@@ -36,14 +36,8 @@ const Index = () => {
   const noServiceConfigured = health && !health.jellyfin && !health.plex;
   const streamystatsAvailable = health?.streamystats ?? false;
 
-  // Auto-select first available service
-  useEffect(() => {
-    if (health) {
-      if (!health.jellyfin && health.plex) {
-        setService("plex");
-      }
-    }
-  }, [health]);
+  // Until the user picks one, default to the first available service
+  const service = chosenService ?? (health && !health.jellyfin && health.plex ? "plex" : "jellyfin");
 
   // Reset filters when service changes
   const handleServiceChange = useCallback((newService: "jellyfin" | "plex") => {
