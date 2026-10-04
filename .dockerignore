@@ -2,6 +2,7 @@
 .git
 .gitignore
 .github
+.forgejo
 .claude
 
 # Secrets — never bake these into an image

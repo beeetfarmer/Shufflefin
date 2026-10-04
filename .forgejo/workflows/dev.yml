@@ -1,0 +1,157 @@
+name: Dev checks
+
+# Every push to dev and every pull request into dev. The image job runs only after every check passes.
+# Runner: label "docker", with the container engine socket handed to jobs (container.docker_host).
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: dev-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CHECKOUT_TOKEN: ${{ github.token }}
+  APP: shufflefin
+
+jobs:
+  frontend:
+    name: Frontend (lint, types, tests, build)
+    runs-on: docker
+    container:
+      image: docker.io/library/node:24-trixie
+    steps:
+      - name: Checkout
+        run: |
+          git config --global --add safe.directory "$PWD"
+          git init -q . && git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c "http.extraheader=Authorization: token $CHECKOUT_TOKEN" fetch -q --depth=1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Install
+        working-directory: frontend
+        run: npm ci --no-fund
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+      - name: Typecheck
+        working-directory: frontend
+        run: npx tsc --noEmit -p tsconfig.app.json
+      - name: Tests
+        working-directory: frontend
+        run: npm test
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  backend:
+    name: Backend (compile, import, pip-audit)
+    runs-on: docker
+    container:
+      image: docker.io/library/python:3.14-trixie    # same Debian release as the Dockerfile base
+    steps:
+      - name: Checkout
+        run: |
+          git config --global --add safe.directory "$PWD"
+          git init -q . && git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c "http.extraheader=Authorization: token $CHECKOUT_TOKEN" fetch -q --depth=1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Install
+        run: pip install -q --root-user-action=ignore -r backend/requirements.txt pip-audit
+      - name: Compile
+        run: python -m compileall -q backend
+      - name: Import app
+        run: python -c "from backend.main import app; print(len(app.routes), 'routes')"
+      - name: Dependency audit
+        run: pip-audit --strict
+
+  sast:
+    name: Semgrep
+    runs-on: docker
+    container:
+      image: docker.io/semgrep/semgrep:1.178.0
+    steps:
+      - name: Checkout
+        run: |
+          git config --global --add safe.directory "$PWD"
+          git init -q . && git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c "http.extraheader=Authorization: token $CHECKOUT_TOKEN" fetch -q --depth=1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Scan
+        run: semgrep scan --metrics off --error --config p/default --config p/python --config p/typescript --config p/react --config p/dockerfile
+
+  secrets:
+    name: Gitleaks
+    runs-on: docker
+    container:
+      image: docker.io/zricethezav/gitleaks:v8.30.1
+    steps:
+      - name: Checkout full history
+        run: |
+          git config --global --add safe.directory "$PWD"
+          git init -q . && git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c "http.extraheader=Authorization: token $CHECKOUT_TOKEN" fetch -q origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Scan history
+        run: gitleaks git . --redact --exit-code 1
+
+  trivy:
+    name: Trivy (dependencies, secrets, config)
+    runs-on: docker
+    container:
+      image: docker.io/aquasec/trivy:0.74.0
+    steps:
+      - name: Install git
+        run: apk add --no-cache git
+      - name: Checkout
+        run: |
+          git config --global --add safe.directory "$PWD"
+          git init -q . && git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c "http.extraheader=Authorization: token $CHECKOUT_TOKEN" fetch -q --depth=1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Scan (fail on fixable HIGH or CRITICAL)
+        run: trivy fs --quiet --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --ignore-unfixed --ignorefile .trivyignore --exit-code 1 .
+
+  image:
+    name: Docker build, smoke test and Trivy scan
+    needs: [frontend, backend, sast, secrets, trivy]
+    runs-on: docker
+    container:
+      image: docker.io/library/docker:28-cli
+    steps:
+      - name: Install git
+        run: apk add --no-cache git
+      - name: Checkout
+        run: |
+          git config --global --add safe.directory "$PWD"
+          git init -q . && git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c "http.extraheader=Authorization: token $CHECKOUT_TOKEN" fetch -q --depth=1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Build
+        # --load: with Podman, the build otherwise stays in BuildKit's cache and the scan finds no image.
+        run: docker build --load --target runtime -t "$APP:ci-$GITHUB_RUN_NUMBER" .
+      - name: Smoke test
+        # Probed from inside the container: a published port would land on the host, not in this job.
+        run: |
+          docker run -d --name "$APP-ci-$GITHUB_RUN_NUMBER" "$APP:ci-$GITHUB_RUN_NUMBER"
+          for i in $(seq 1 30); do
+            if docker exec "$APP-ci-$GITHUB_RUN_NUMBER" python -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8005/', timeout=4); u.urlopen('http://127.0.0.1:8005/openapi.json', timeout=4)"; then
+              echo "UI and OpenAPI served on attempt $i"; exit 0
+            fi
+            sleep 2
+          done
+          docker logs "$APP-ci-$GITHUB_RUN_NUMBER"; exit 1
+      - name: Scan image (fail on fixable HIGH or CRITICAL)
+        # Streamed in, never through a mounted socket: works the same with Docker and rootless Podman.
+        run: |
+          docker save -o image.tar "$APP:ci-$GITHUB_RUN_NUMBER"
+          tar -c image.tar .trivyignore | docker run --rm -i --entrypoint sh docker.io/aquasec/trivy:0.74.0 \
+            -c 'mkdir /w && tar -x -C /w && trivy image --quiet --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /w/.trivyignore --exit-code 1 --input /w/image.tar'
+      - name: Remove image
+        if: always()
+        run: |
+          docker rm -f "$APP-ci-$GITHUB_RUN_NUMBER" || true
+          docker image rm -f "$APP:ci-$GITHUB_RUN_NUMBER" || true

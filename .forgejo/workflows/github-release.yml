@@ -1,0 +1,40 @@
+name: GitHub release
+
+# Copies each published Forgejo release to the GitHub mirror. The push mirror
+# carries branches and tags, but not releases.
+# Needs the GH_RELEASE_TOKEN secret: a GitHub fine-grained token for
+# beeetfarmer/Shufflefin with Contents: Read and write.
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  github:
+    name: Copy release to GitHub
+    runs-on: docker
+    container:
+      image: docker.io/library/alpine:3.22
+    env:
+      GH_REPO: beeetfarmer/Shufflefin
+      GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
+      RELEASE: ${{ toJSON(github.event.release) }}
+    steps:
+      - name: Install tools
+        run: apk add --no-cache curl jq
+      - name: Wait for the push mirror to carry the tag
+        # Creating the release before the tag arrives would make GitHub cut its own tag.
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "Set the GH_RELEASE_TOKEN secret"; exit 1; }
+          tag=$(printf '%s' "$RELEASE" | jq -r .tag_name)
+          for i in $(seq 1 30); do
+            curl -fs -o /dev/null -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$GH_REPO/git/ref/tags/$tag" && exit 0
+            sleep 20
+          done
+          echo "Tag $tag never reached GitHub. Check the push mirror."; exit 1
+      - name: Create the GitHub release
+        run: |
+          printf '%s' "$RELEASE" | jq '{tag_name, name, body, prerelease, draft: false}' |
+            curl -fsS -X POST -o /dev/null \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$GH_REPO/releases" -d @-

@@ -53,10 +53,10 @@ def proxy_image(
     try:
         if service == "jellyfin":
             url = f"{JELLYFIN_URL}/Items/{item_id}/Images/Primary"
-            resp = requests.get(url, headers=get_jellyfin_headers(), stream=True, timeout=REQUEST_TIMEOUT)
+            resp = requests.get(url, headers=get_jellyfin_headers(), stream=True, timeout=REQUEST_TIMEOUT)  # nosemgrep: ssrf-requests -- host is fixed config, item_id is regex-validated
         elif service == "plex":
             url = f"{PLEX_URL}/library/metadata/{item_id}/thumb"
-            resp = requests.get(url, headers=get_plex_headers(), stream=True, timeout=REQUEST_TIMEOUT)
+            resp = requests.get(url, headers=get_plex_headers(), stream=True, timeout=REQUEST_TIMEOUT)  # nosemgrep: ssrf-requests -- host is fixed config, item_id is regex-validated
 
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail="Image not found")
